@@ -1,0 +1,43 @@
+name: Module C - Exhaustion Signal
+
+on:
+  schedule:
+    # Every 5 minutes (UTC), offset by 2 to wait for the just-closed 5m bar.
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to commit state/*.json back to the repo
+
+concurrency:
+  group: module-c-state
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - run: python -m modules.exhaustion_signal
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: Commit state if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          if git diff --staged --quiet; then
+            echo "No state changes"
+          else
+            git commit -m "chore: update Module C state [skip ci]"
+            # Best-effort push; retry once after rebase if upstream moved
+            git push || (git pull --rebase && git push)
+          fi

@@ -1,0 +1,22 @@
+name: Module B - 60m EMA Cross
+
+on:
+  schedule:
+    # Hourly at minute 2 (UTC). Gives yfinance time to publish the just-closed bar.
+    - cron: '2 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - run: python -m modules.ema_cross_60m
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

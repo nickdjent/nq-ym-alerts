@@ -1,0 +1,24 @@
+name: Module A - Daily Range
+
+on:
+  schedule:
+    # 18:05 ET = 22:05 UTC (EDT) or 23:05 UTC (EST)
+    # Both crons fire year-round; program gates via is_module_a_window().
+    - cron: '5 22 * * 0-4'   # EDT (Mar-Nov) — Sun..Thu
+    - cron: '5 23 * * 0-4'   # EST (Nov-Mar) — Sun..Thu
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - run: python -m modules.daily_range
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

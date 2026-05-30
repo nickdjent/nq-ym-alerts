@@ -1,0 +1,28 @@
+name: Monthly Heartbeat
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'   # 1st day of each month, 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Append heartbeat log
+        run: |
+          mkdir -p logs
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) heartbeat" >> logs/heartbeat.log
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add logs/
+          if git diff --staged --quiet; then
+            echo "No heartbeat changes"
+          else
+            git commit -m "chore: monthly heartbeat [skip ci]"
+            git push
+          fi
