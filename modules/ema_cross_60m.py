@@ -1,12 +1,17 @@
 """Module B — 60m EMA5/10 golden/death cross alerts (stateless)."""
 from __future__ import annotations
 
+import os
 import sys
 
 from lib.data import fetch_intraday_bars
 from lib.indicators import detect_cross, ema
 from lib.market_hours import is_market_open, now_et
 from lib.telegram import send_error_alert, send_message
+
+
+def _force_run_enabled() -> bool:
+    return os.environ.get("FORCE_RUN", "").strip().lower() in ("1", "true", "yes")
 
 TICKERS = [
     ("NQ=F", "NQ", 2),
@@ -76,8 +81,14 @@ def check_ticker(ticker: str, name: str, decimals: int, send=send_message) -> bo
 
 def run(send=send_message) -> None:
     if not is_market_open():
-        print(f"Module B: market closed ({now_et().isoformat()}), exit 0")
-        return
+        if _force_run_enabled():
+            print(
+                f"Module B: market closed ({now_et().isoformat()}) "
+                f"but FORCE_RUN=true, proceeding"
+            )
+        else:
+            print(f"Module B: market closed ({now_et().isoformat()}), exit 0")
+            return
     for tkr, name, dec in TICKERS:
         check_ticker(tkr, name, dec, send=send)
 

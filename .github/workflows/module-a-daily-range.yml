@@ -7,6 +7,11 @@ on:
     - cron: '5 22 * * 0-4'   # EDT (Mar-Nov) — Sun..Thu
     - cron: '5 23 * * 0-4'   # EST (Nov-Mar) — Sun..Thu
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Bypass time-window gate (debug only — pushes a real Telegram message)'
+        type: boolean
+        default: false
 
 jobs:
   run:
@@ -22,3 +27,4 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_RUN: ${{ inputs.force_run }}

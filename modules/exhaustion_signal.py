@@ -20,6 +20,10 @@ from lib.indicators import detect_cross, ema
 from lib.market_hours import ET_TZ, is_market_open, now_et
 from lib.telegram import send_error_alert, send_message
 
+
+def _force_run_enabled() -> bool:
+    return os.environ.get("FORCE_RUN", "").strip().lower() in ("1", "true", "yes")
+
 TICKERS = [
     ("NQ=F", "NQ"),
     ("YM=F", "YM"),
@@ -213,8 +217,14 @@ def process_ticker(ticker: str, name: str, send=send_message) -> dict:
 
 def run(send=send_message, persist: bool = True) -> None:
     if not is_market_open():
-        print(f"Module C: market closed ({now_et().isoformat()}), exit 0")
-        return
+        if _force_run_enabled():
+            print(
+                f"Module C: market closed ({now_et().isoformat()}) "
+                f"but FORCE_RUN=true, proceeding"
+            )
+        else:
+            print(f"Module C: market closed ({now_et().isoformat()}), exit 0")
+            return
 
     for tkr, name in TICKERS:
         new_state = process_ticker(tkr, name, send=send)

@@ -5,6 +5,11 @@ on:
     # Hourly at minute 2 (UTC). Gives yfinance time to publish the just-closed bar.
     - cron: '2 * * * *'
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Bypass market-hours gate (debug only)'
+        type: boolean
+        default: false
 
 jobs:
   run:
@@ -20,3 +25,4 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_RUN: ${{ inputs.force_run }}

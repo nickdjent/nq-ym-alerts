@@ -1,12 +1,17 @@
 """Module A — daily operating range (Open ± ADR) push."""
 from __future__ import annotations
 
+import os
 import sys
 
 from lib.data import fetch_daily_bars, get_globex_session_open
 from lib.indicators import adr
 from lib.market_hours import is_module_a_window, now_et
 from lib.telegram import send_error_alert, send_message
+
+
+def _force_run_enabled() -> bool:
+    return os.environ.get("FORCE_RUN", "").strip().lower() in ("1", "true", "yes")
 
 TICKERS = [
     ("NQ=F", "NQ", 2),  # (yfinance ticker, display name, decimals)
@@ -61,10 +66,16 @@ def format_message(per_ticker: dict) -> str:
 
 def run(send=send_message) -> None:
     if not is_module_a_window():
-        print(
-            f"Module A: outside push window ({now_et().isoformat()}), exit 0"
-        )
-        return
+        if _force_run_enabled():
+            print(
+                f"Module A: outside push window ({now_et().isoformat()}) "
+                f"but FORCE_RUN=true, proceeding"
+            )
+        else:
+            print(
+                f"Module A: outside push window ({now_et().isoformat()}), exit 0"
+            )
+            return
 
     results = {}
     for tkr, _name, _dec in TICKERS:
