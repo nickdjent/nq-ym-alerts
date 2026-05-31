@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time as _time
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 import pandas as pd
 import pytz
@@ -63,8 +63,15 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def fetch_daily_bars(ticker: str, days: int = 30) -> pd.DataFrame:
     """
-    Closed daily bars only. Columns: Open, High, Low, Close, Volume.
-    Index: ET tz-aware timestamps. NaN rows dropped.
+    Settled daily futures bars. Columns: Open, High, Low, Close, Volume.
+
+    yfinance returns daily futures bars indexed by a naive midnight Timestamp
+    whose date is the trading-day label in ET (e.g., `2026-05-29 00:00` is
+    Friday May 29's full session, which settles Fri 17:00 ET). We tz-localize
+    that to ET — NOT tz_convert from UTC, which would shift the date by one.
+
+    The last bar is dropped only if its settle time (date + 17:00 ET) is
+    still in the future, i.e. the session hasn't closed yet.
     """
     ticker = _normalize_ticker(ticker)
     period = f"{max(days + 5, 10)}d"
@@ -86,15 +93,23 @@ def fetch_daily_bars(ticker: str, days: int = 30) -> pd.DataFrame:
     df = _flatten_columns(df)
     df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
     df.dropna(inplace=True)
-    df = _to_et_index(df)
 
-    # Drop today's bar if not yet closed (today's session not complete in ET)
+    if df.empty:
+        return df
+
+    # Localize (don't convert) — preserves the trading-day date label
+    if df.index.tz is None:
+        df.index = df.index.tz_localize(ET_TZ)
+    else:
+        df.index = df.index.tz_convert(ET_TZ)
+
+    # Drop the last bar only if it hasn't settled yet (futures settle 17:00 ET)
     now = now_et()
-    if not df.empty:
-        last_ts = df.index[-1]
-        # For daily futures bars, treat "today" in ET as potentially still forming
-        if last_ts.date() >= now.date():
-            df = df.iloc[:-1]
+    last_date = df.index[-1].date()
+    settle_time = ET_TZ.localize(datetime.combine(last_date, time(17, 0)))
+    if now < settle_time:
+        df = df.iloc[:-1]
+
     return df.tail(days)
 
 

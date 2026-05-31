@@ -29,7 +29,11 @@ def compute_levels(ticker: str):
     """Pure computation; returns dict of levels for one ticker."""
     open_time, open_price = get_globex_session_open(ticker)
     daily_df = fetch_daily_bars(ticker, days=30)
-    adr_10 = adr(daily_df, period=10)
+    # ADR(10) is computed across the 10 daily bars STRICTLY BEFORE the
+    # session that's about to open — i.e., the previous trading day and
+    # the 9 days before that.
+    daily_df_pre_open = daily_df[daily_df.index < open_time]
+    adr_10 = adr(daily_df_pre_open, period=10)
 
     return {
         "open_time": open_time,
