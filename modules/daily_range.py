@@ -1,17 +1,45 @@
 """Module A — daily operating range (Open ± ADR) push."""
 from __future__ import annotations
 
+import json
 import os
 import sys
+from pathlib import Path
 
 from lib.data import fetch_daily_bars, get_globex_session_open
 from lib.indicators import adr
 from lib.market_hours import is_module_a_window, now_et
 from lib.telegram import send_error_alert, send_message
 
+STATE_DIR = Path(__file__).resolve().parent.parent / "state"
+STATE_PATH = STATE_DIR / "module_a.json"
+
 
 def _force_run_enabled() -> bool:
     return os.environ.get("FORCE_RUN", "").strip().lower() in ("1", "true", "yes")
+
+
+def load_state() -> dict:
+    if not STATE_PATH.exists():
+        return {"last_push_date": None}
+    try:
+        with STATE_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        base = {"last_push_date": None}
+        base.update(data)
+        return base
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Module A: failed to read state {STATE_PATH}, resetting. err={e}")
+        return {"last_push_date": None}
+
+
+def save_state(state: dict) -> None:
+    """Atomic write to STATE_PATH."""
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE_PATH.with_suffix(STATE_PATH.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, STATE_PATH)
 
 TICKERS = [
     ("NQ=F", "NQ", 2),  # (yfinance ticker, display name, decimals)
@@ -68,9 +96,11 @@ def format_message(per_ticker: dict) -> str:
     return header + "\n" + "\n\n".join(sections)
 
 
-def run(send=send_message) -> None:
+def run(send=send_message, persist: bool = True) -> None:
+    force = _force_run_enabled()
+
     if not is_module_a_window():
-        if _force_run_enabled():
+        if force:
             print(
                 f"Module A: outside push window ({now_et().isoformat()}) "
                 f"but FORCE_RUN=true, proceeding"
@@ -81,6 +111,16 @@ def run(send=send_message) -> None:
             )
             return
 
+    # Per-day dedup — only one push per ET trading day
+    state = load_state()
+    today_et = now_et().strftime("%Y-%m-%d")
+    if state.get("last_push_date") == today_et and not force:
+        print(
+            f"Module A: already pushed today ({today_et}), skip "
+            f"(dedup via state/module_a.json)"
+        )
+        return
+
     results = {}
     for tkr, _name, _dec in TICKERS:
         results[tkr] = compute_levels(tkr)
@@ -88,6 +128,10 @@ def run(send=send_message) -> None:
     text = format_message(results)
     send(text)
     print("Module A: message sent")
+
+    state["last_push_date"] = today_et
+    if persist:
+        save_state(state)
 
 
 def main() -> int:

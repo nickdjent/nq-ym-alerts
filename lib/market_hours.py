@@ -49,7 +49,9 @@ def is_module_a_window(now: datetime | None = None) -> bool:
     """
     Module A push window:
       - Sunday ~ Thursday ET
-      - 18:00 ~ 18:15 ET (cron jitter buffer)
+      - 18:00 ~ 19:45 ET  (wide window so GitHub Actions cron lag is absorbed;
+        per-day dedup state file ensures only one push fires regardless of
+        how many cron attempts land inside)
     """
     if now is None:
         now = now_et()
@@ -64,7 +66,7 @@ def is_module_a_window(now: datetime | None = None) -> bool:
         return False
 
     t = now.time()
-    return time(18, 0) <= t <= time(18, 15)
+    return time(18, 0) <= t <= time(19, 45)
 
 
 def previous_session_open_datetime(now: datetime | None = None) -> datetime:

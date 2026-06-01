@@ -2,22 +2,40 @@ name: Module A - Daily Range
 
 on:
   schedule:
-    # 18:05 ET = 22:05 UTC (EDT) or 23:05 UTC (EST)
-    # Both crons fire year-round; program gates via is_module_a_window().
-    - cron: '5 22 * * 0-4'   # EDT (Mar-Nov) — Sun..Thu
-    - cron: '5 23 * * 0-4'   # EST (Nov-Mar) — Sun..Thu
+    # Goal: at least one fire lands inside 18:00–19:45 ET on Sun–Thu
+    # even when GitHub Actions cron is delayed up to ~90 min.
+    # Per-day dedup state ensures we still push exactly once per day.
+    #
+    # EDT (Mar–Nov): ET = UTC - 4
+    #   22:00–23:45 UTC on UTC Sun–Thu  →  18:00–19:45 EDT on ET Sun–Thu
+    - cron: '*/15 22-23 * * 0-4'
+    # EST (Nov–Mar): ET = UTC - 5
+    #   23:00–23:45 UTC on UTC Sun–Thu  →  18:00–18:45 EST on ET Sun–Thu
+    #     (already covered by the line above — runs at 23:xx UTC are also
+    #     valid EST attempts; the in-program gate handles it.)
+    #   00:00–00:45 UTC on UTC Mon–Fri  →  19:00–19:45 EST on ET Sun–Thu
+    - cron: '*/15 0 * * 1-5'
   workflow_dispatch:
     inputs:
       force_run:
-        description: 'Bypass time-window gate (debug only — pushes a real Telegram message)'
+        description: 'Bypass time-window AND dedup (debug only — pushes a real Telegram message)'
         type: boolean
         default: false
+
+permissions:
+  contents: write   # commit dedup state back to repo
+
+concurrency:
+  group: module-a-state
+  cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -28,3 +46,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FORCE_RUN: ${{ inputs.force_run }}
+      - name: Commit state if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          if git diff --staged --quiet; then
+            echo "No state changes"
+          else
+            git commit -m "chore: update Module A state [skip ci]"
+            git push || (git pull --rebase && git push)
+          fi

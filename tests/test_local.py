@@ -44,8 +44,10 @@ def run_daily_range():
     _patch_telegram()
     from modules import daily_range
 
-    # Bypass time-window gate
+    # Bypass time-window gate AND per-day dedup state (in-memory only)
     daily_range.is_module_a_window = lambda *a, **kw: True  # type: ignore[assignment]
+    daily_range.load_state = lambda: {"last_push_date": None}  # type: ignore[assignment]
+    daily_range.save_state = lambda s: None  # type: ignore[assignment]
 
     print(f"== Module A dry-run @ {now_et().isoformat()} ==")
     for tkr, name, decimals in daily_range.TICKERS:
