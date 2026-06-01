@@ -69,6 +69,8 @@ def run_ema_cross_60m():
     from modules import ema_cross_60m
 
     ema_cross_60m.is_market_open = lambda *a, **kw: True  # type: ignore[assignment]
+    ema_cross_60m.load_state = lambda t: {"last_alerted_cross_ts": None}  # type: ignore[assignment]
+    ema_cross_60m.save_state = lambda t, s: None  # type: ignore[assignment]
     print(f"== Module B dry-run @ {now_et().isoformat()} ==")
     for tkr, name, dec in ema_cross_60m.TICKERS:
         print(f"\n--- {name} ({tkr}) ---")

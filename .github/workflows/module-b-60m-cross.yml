@@ -2,20 +2,31 @@ name: Module B - 60m EMA Cross
 
 on:
   schedule:
-    # Hourly at minute 2 (UTC). Gives yfinance time to publish the just-closed bar.
+    # Hourly at minute 2 (UTC). Per-ticker state (state/{nq,ym}_module_b.json)
+    # dedups by latest-alerted cross timestamp, so cron lag that causes two
+    # fires to land close together still only pushes once.
     - cron: '2 * * * *'
   workflow_dispatch:
     inputs:
       force_run:
-        description: 'Bypass market-hours gate (debug only)'
+        description: 'Bypass market-hours gate AND dedup (debug only)'
         type: boolean
         default: false
+
+permissions:
+  contents: write   # commit dedup state back to repo
+
+concurrency:
+  group: module-b-state
+  cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -26,3 +37,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FORCE_RUN: ${{ inputs.force_run }}
+      - name: Commit state if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          if git diff --staged --quiet; then
+            echo "No state changes"
+          else
+            git commit -m "chore: update Module B state [skip ci]"
+            git push || (git pull --rebase && git push)
+          fi
