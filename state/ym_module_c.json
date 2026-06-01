@@ -1,7 +1,7 @@
 {
   "active_60m_cross": {
     "direction": "golden",
-    "timestamp": "2026-06-01T15:00:00-04:00"
+    "timestamp": "2026-06-01T16:00:00-04:00"
   },
-  "alerted_entry": true
+  "alerted_entry": false
 }
