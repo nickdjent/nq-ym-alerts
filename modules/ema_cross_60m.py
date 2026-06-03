@@ -139,10 +139,10 @@ def check_ticker(
     ema10_val = float(df.loc[last_cross_ts, "ema10"])
 
     if cross_type == "golden":
-        title = f"⭐️ *{name} 60m 黃金交叉*"
+        title = f"🔺 *{name} 60m 黃金交叉*"
         arrow = "⬆"
     else:
-        title = f"💀 *{name} 60m 死亡交叉*"
+        title = f"⬇️ *{name} 60m 死亡交叉*"
         arrow = "⬇"
 
     text = (

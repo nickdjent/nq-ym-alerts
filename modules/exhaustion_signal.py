@@ -203,7 +203,7 @@ def process_ticker(ticker: str, name: str, send=send_message) -> dict:
         return state
 
     text = (
-        f"⚠️ *{name} 進場訊號*\n"
+        f"⭐️ *{name} 進場訊號*\n"
         f"🕐 {now_et().strftime('%Y-%m-%d %H:%M ET')}\n\n"
         f"60m 主趨勢: {_dir_to_chinese(active_dir)} "
         f"(since {active_ts.strftime('%Y-%m-%d %H:%M ET')})\n"
