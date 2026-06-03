@@ -159,6 +159,75 @@ def fetch_intraday_bars(
     return df
 
 
+def fetch_session_aggregates(
+    ticker: str, days: int = 30, period: str = "60d"
+) -> pd.DataFrame:
+    """
+    Aggregate 5m intraday bars into Globex daily sessions for futures.
+
+    Each row = one trading day's session in the standard futures convention:
+        session_start = (D-1 calendar day) 18:00 ET
+        session_end   = D day 17:00 ET   (= settlement)
+
+    For Mon D, this gives session_start = Sun 18:00 ET (Sunday Globex re-open).
+    Saturdays have no session and are skipped. In-progress sessions (where
+    `now < session_end`) are excluded — so only fully settled sessions appear.
+
+    Returns DataFrame with columns Open, High, Low, Close, Volume, indexed by
+    `session_end` timestamp (tz-aware ET, D at 17:00). Most recent `days` rows.
+
+    This is the preferred input for Module A's ADR — it sidesteps yfinance's
+    daily-bar labeling quirks (where the "Tue Jun 2" daily bar actually tracks
+    the still-forming Wed session starting Tue 18:00 ET).
+    """
+    df5 = fetch_intraday_bars(ticker, interval="5m", period=period)
+    if df5.empty:
+        return df5
+
+    now = now_et()
+    all_dates = sorted({ts.date() for ts in df5.index})
+    if not all_dates:
+        return pd.DataFrame()
+
+    earliest, latest = all_dates[0], all_dates[-1]
+
+    rows = []
+    d = earliest
+    while d <= latest:
+        if d.weekday() < 5:  # Mon-Fri (skip Sat/Sun as session-end dates)
+            session_start = ET_TZ.localize(
+                datetime.combine(d - timedelta(days=1), time(18, 0))
+            )
+            session_end = ET_TZ.localize(datetime.combine(d, time(17, 0)))
+
+            if now >= session_end:  # only fully-settled sessions
+                mask = (df5.index >= session_start) & (df5.index < session_end)
+                sub = df5[mask]
+                if not sub.empty:
+                    vol = (
+                        float(sub["Volume"].sum())
+                        if "Volume" in sub.columns
+                        else 0.0
+                    )
+                    rows.append(
+                        {
+                            "Date": session_end,
+                            "Open": float(sub["Open"].iloc[0]),
+                            "High": float(sub["High"].max()),
+                            "Low": float(sub["Low"].min()),
+                            "Close": float(sub["Close"].iloc[-1]),
+                            "Volume": vol,
+                        }
+                    )
+        d += timedelta(days=1)
+
+    if not rows:
+        return pd.DataFrame()
+
+    out = pd.DataFrame(rows).set_index("Date")
+    return out.tail(days)
+
+
 def get_globex_session_open(ticker: str) -> tuple[datetime, float]:
     """
     Most recent Globex session open: ET 18:00 5m bar's Open price.

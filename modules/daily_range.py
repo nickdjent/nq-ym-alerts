@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from lib.data import fetch_daily_bars, get_globex_session_open
+from lib.data import fetch_session_aggregates, get_globex_session_open
 from lib.indicators import adr
 from lib.market_hours import is_module_a_window, now_et
 from lib.telegram import send_error_alert, send_message
@@ -56,12 +56,12 @@ def _fmt(value: float, decimals: int) -> str:
 def compute_levels(ticker: str):
     """Pure computation; returns dict of levels for one ticker."""
     open_time, open_price = get_globex_session_open(ticker)
-    daily_df = fetch_daily_bars(ticker, days=30)
-    # ADR(10) is computed across the 10 daily bars STRICTLY BEFORE the
-    # session that's about to open — i.e., the previous trading day and
-    # the 9 days before that.
-    daily_df_pre_open = daily_df[daily_df.index < open_time]
-    adr_10 = adr(daily_df_pre_open, period=10)
+    # ADR(10) is computed from 5m bars aggregated into Globex daily sessions
+    # (Mon 18:00 ET → Tue 17:00 ET = "Tuesday's session", etc.). Sidesteps
+    # yfinance daily-bar labelling quirks. Only fully-settled sessions are
+    # returned, so the last 10 = the 10 most recent settled trading days.
+    sessions = fetch_session_aggregates(ticker, days=30)
+    adr_10 = adr(sessions, period=10)
 
     return {
         "open_time": open_time,
