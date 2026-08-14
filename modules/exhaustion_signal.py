@@ -19,6 +19,7 @@ from lib.data import fetch_intraday_bars
 from lib.indicators import detect_cross, ema
 from lib.market_hours import ET_TZ, is_market_open, now_et
 from lib.telegram import send_error_alert, send_message
+from modules.telegram_formatters import format_entry_signal_alert
 
 
 def _force_run_enabled() -> bool:
@@ -81,10 +82,6 @@ def _parse_iso_et(s: str) -> datetime:
     else:
         dt = dt.astimezone(ET_TZ)
     return dt
-
-
-def _dir_to_chinese(direction: str) -> str:
-    return "上升" if direction == "golden" else "下降"
 
 
 def process_ticker(ticker: str, name: str, send=send_message) -> dict:
@@ -202,13 +199,7 @@ def process_ticker(ticker: str, name: str, send=send_message) -> dict:
         )
         return state
 
-    text = (
-        f"⭐️ *{name} 進場訊號*\n"
-        f"🕐 {now_et().strftime('%Y-%m-%d %H:%M ET')}\n\n"
-        f"60m 主趨勢: {_dir_to_chinese(active_dir)} "
-        f"(since {active_ts.strftime('%Y-%m-%d %H:%M ET')})\n"
-        f"回檔訊號於: `{cross_dt.strftime('%Y-%m-%d %H:%M ET')}`"
-    )
+    text = format_entry_signal_alert(name, active_dir, cross_dt)
     send(text)
     state["alerted_entry"] = True
     print(f"Module C ({name}): entry signal alert sent")

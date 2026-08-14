@@ -18,6 +18,7 @@ from lib.data import fetch_intraday_bars
 from lib.indicators import detect_cross, ema
 from lib.market_hours import ET_TZ, is_market_open, now_et
 from lib.telegram import send_error_alert, send_message
+from modules.telegram_formatters import format_60m_cross_alert
 
 TICKERS = [
     ("NQ=F", "NQ", 2),
@@ -75,12 +76,6 @@ def save_state(ticker: str, state: dict) -> None:
     os.replace(tmp, path)
 
 
-def _fmt(value: float, decimals: int) -> str:
-    if decimals == 0:
-        return f"{value:,.0f}"
-    return f"{value:,.{decimals}f}"
-
-
 def check_ticker(
     ticker: str,
     name: str,
@@ -135,23 +130,8 @@ def check_ticker(
         return False
 
     close_val = float(df.loc[last_cross_ts, "Close"])
-    ema5_val = float(df.loc[last_cross_ts, "ema5"])
-    ema10_val = float(df.loc[last_cross_ts, "ema10"])
-
-    if cross_type == "golden":
-        title = f"🔺 *{name} 60m 黃金交叉*"
-        arrow = "⬆"
-    else:
-        title = f"⬇️ *{name} 60m 死亡交叉*"
-        arrow = "⬇"
-
-    text = (
-        f"{title}\n"
-        f"🕐 {now_et().strftime('%Y-%m-%d %H:%M ET')}\n\n"
-        f"K 棒時間: `{last_cross_ts.strftime('%Y-%m-%d %H:%M ET')}`\n"
-        f"收盤價: `{_fmt(close_val, decimals)}`\n"
-        f"EMA5: `{_fmt(ema5_val, decimals)}` {arrow} "
-        f"EMA10: `{_fmt(ema10_val, decimals)}`"
+    text = format_60m_cross_alert(
+        name, cross_type, last_cross_dt, close_val, decimals
     )
     send(text)
 

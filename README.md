@@ -23,6 +23,9 @@
 - 「Golden cross」：前一根 EMA5 ≤ EMA10 且當根 EMA5 > EMA10
 - 「Death cross」：前一根 EMA5 ≥ EMA10 且當根 EMA5 < EMA10
 - **無狀態設計**：只在「最新已收盤 K 棒」剛發生交叉時推播。漏跑就漏訊（接受 trade-off）
+- Telegram 內容只保留粗體標題、`收K時間`與`收盤價`：黃金交叉使用 `🔺`，死亡交叉使用 `🔻`。不顯示發送時間或 EMA 數值。
+- yfinance 的 60m 資料索引代表開 K 時間；顯示的`收K時間`一律為交叉索引 `+ 60 分鐘`。此僅影響顯示，state、stale 與 dedup 仍使用原始交叉索引時間。
+- NQ 收盤價維持兩位小數，YM 維持整數。
 
 ### Module C — 逢回進場訊號（buy-the-dip / sell-the-bounce）
 每 5 分鐘跑一次，使用 `state/{nq,ym}_module_c.json` 作為狀態存檔。
@@ -35,6 +38,8 @@
 3. 每個主趨勢週期只推一次（dedup）
 4. 3 小時窗過後不再推播，等下一個 60m 新交叉
 5. 5m 訊號必須在「最新已收盤的 5m K 棒」剛發生才推（避免重複偵測舊訊號）
+
+Telegram 內容只保留粗體 `⭐️ <商品> 進場訊號` 標題、`60m 主趨勢: 上升/下降`與原始 5m `回檔訊號於`時間；不顯示發送時間或主趨勢的 `since` 時間。此文字格式不影響 3 小時視窗、反向交叉或每趨勢一次推播規則。
 
 ## 部署 SOP（從零到收到第一則訊息）
 
@@ -95,6 +100,9 @@ python tests/test_telegram.py
 python tests/test_local.py daily_range
 python tests/test_local.py ema_cross_60m
 python tests/test_local.py exhaustion_signal
+
+# 離線驗證 Telegram 文字格式（不連網、不發訊息）
+python3 -m unittest tests.test_telegram_formatters
 ```
 
 `test_local.py` 會繞過時間窗 / 市場開盤判斷，所以隨時都能看到輸出。
